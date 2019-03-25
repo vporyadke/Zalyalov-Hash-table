@@ -13,28 +13,20 @@ public:
 private:
     std::list<std::pair<const KeyType, ValueType>> values;
 
-    class Element{
-        friend class HashMap;
-
-        KeyType key;
-        iterator it;
-
-        Element(KeyType key, iterator it) : key(key), it(it) {}
-    };
 
     size_t sz = 100000;
-    std::vector<std::list<Element>> table;
+    std::vector<std::list<iterator>> table;
     Hash hasher;
 
     void copy_to_table() {
         for (iterator it = values.begin(); it != values.end(); ++it) {
-            table[hasher(it->first) % sz].push_back(Element(it->first, it));
+            table[hasher(it->first) % sz].push_back(it);
         }
     }
 
     void realloc() {
         sz *= 2;
-        table = std::vector<std::list<Element>>(sz);
+        table = std::vector<std::list<iterator>>(sz);
         copy_to_table();
     }
 
@@ -59,9 +51,9 @@ public:
 
     iterator find(KeyType key) {
         size_t h = hasher(key) % sz;
-        for (Element& i : table[h]) {
-            if (i.key == key) {
-                return i.it;
+        for (iterator& i : table[h]) {
+            if (i->first == key) {
+                return i;
             }
         }
         return end();
@@ -69,9 +61,9 @@ public:
 
     const_iterator find(KeyType key) const {
         size_t h = hasher(key);
-        for (const Element& i : table[h]) {
-            if (i.key == key) {
-                return i.it;
+        for (const iterator& i : table[h]) {
+            if (i->first == key) {
+                return i;
             }
         }
         return end();
@@ -83,7 +75,7 @@ public:
             return;
         }
         values.push_back(p);
-        table[hasher(p.first) % sz].push_back(Element(p.first, --end()));
+        table[hasher(p.first) % sz].push_back(--end());
     }
 
     template<typename Iterator>
@@ -110,8 +102,8 @@ public:
     void erase(KeyType key) {
         size_t h = hasher(key) % sz;
         for (auto it = table[h].begin(); it != table[h].end(); ++it) {
-            if (it->key == key) {
-                values.erase(it->it);
+            if ((*it)->first == key) {
+                values.erase(*it);
                 table[h].erase(it);
                 return;
             }
@@ -125,7 +117,7 @@ public:
         }
         values.push_back({key, ValueType()});
         size_t h = hasher(key) % sz;
-        table[h].push_back(Element(key, --values.end()));
+        table[h].push_back(--values.end());
         return values.back().second;
     }
 
