@@ -11,10 +11,12 @@ public:
     typedef typename std::list<std::pair<const KeyType, ValueType>>::const_iterator const_iterator;
 
 private:
+    static constexpr double MAX_LOAD_FACTOR = 0.75;
+    static constexpr double MIN_LOAD_FACTOR = MAX_LOAD_FACTOR * 0.25;
+    static constexpr size_t START_SIZE = 32;
+
     std::list<std::pair<const KeyType, ValueType>> values;
-
-
-    size_t sz = 100000;
+    size_t sz = START_SIZE;
     std::vector<std::list<iterator>> table;
     Hash hasher;
 
@@ -24,8 +26,8 @@ private:
         }
     }
 
-    void realloc() {
-        sz *= 2;
+    void realloc(size_t new_size) {
+        sz = new_size;
         table = std::vector<std::list<iterator>>(sz);
         copy_to_table();
     }
@@ -76,16 +78,21 @@ public:
         }
         values.push_back(p);
         table[hasher(p.first) % sz].push_back(--end());
+        if (values.size() > sz * MAX_LOAD_FACTOR) {
+            realloc(sz * 2);
+        }
     }
 
     template<typename Iterator>
-    HashMap(Iterator begin, Iterator end, Hash h = Hash{}) : values(begin, end), table(sz), hasher(h) {
+    HashMap(Iterator begin, Iterator end, Hash h = Hash{}) : values(begin, end), hasher(h) {
+        while (values.size() > sz * MAX_LOAD_FACTOR) {
+            sz *= 2;
+        }
+        table.resize(sz);
         copy_to_table();
     }
 
-    HashMap(std::initializer_list<std::pair<const KeyType, ValueType>> elems, Hash h = Hash{}) : values(elems.begin(), elems.end()), table(sz), hasher(h) {
-        copy_to_table();
-    }
+    HashMap(std::initializer_list<std::pair<const KeyType, ValueType>> elems, Hash h = Hash{}) : HashMap(elems.begin(), elems.end(), h) {}
 
     size_t size() const {
         return values.size();
@@ -134,6 +141,20 @@ public:
             table[hasher(p.first) % sz].clear();
         }
         values.clear();
+    }
+
+    void shrink_to_fit() {
+        size_t new_size = sz;
+        while (new_size > 1 && values.size() < new_size * MIN_LOAD_FACTOR) {
+            new_size /= 2;
+        }
+        if (new_size != sz) {
+            realloc(new_size);
+            return;
+        }
+        for (auto& i : table) {
+            i.clear();
+        }
     }
 
     HashMap& operator=(const HashMap& other) {
